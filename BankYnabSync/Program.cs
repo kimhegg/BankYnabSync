@@ -1,0 +1,42 @@
+﻿
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using BankYnabSync.Models;
+using BankYnabSync.Services;
+
+namespace BankYnabSync;
+
+    public class Program
+    {
+        public static async Task Main(string[] args)
+        {
+            var host = CreateHostBuilder(args).Build();
+
+            using var scope = host.Services.CreateScope();
+            var services = scope.ServiceProvider;
+            try
+            {
+                var syncService = services.GetRequiredService<SyncService>();
+                await syncService.SyncTransactions();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }
+        }
+
+        private static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureAppConfiguration((hostingContext, config) =>
+                {
+                    config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                    config.AddJsonFile($"appsettings.{hostingContext.HostingEnvironment.EnvironmentName}.json", optional: true);
+                    config.AddEnvironmentVariables();
+                })
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddTransient<IBank, BankNorwegian>();
+                    services.AddTransient<SyncService>();
+                });
+    }
