@@ -1,7 +1,5 @@
-using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using BankYnabSync.Models;
 using Microsoft.Extensions.Configuration;
 
@@ -18,7 +16,7 @@ public class BankNorwegian : IBank
     private readonly IConfiguration _configuration;
     private readonly string _accountPath;
 
-    public BankNorwegian(IConfiguration configuration)
+    public BankNorwegian(IConfiguration configuration, HttpClient? httpClient = null)
     {
         _baseUrl = configuration["BankNorwegian:BaseUrl"];
         _accountPath = configuration["BankNorwegian:AccountPath"];
@@ -29,10 +27,10 @@ public class BankNorwegian : IBank
             throw new InvalidOperationException("Bank Norwegian URL or API Key is missing from configuration.");
 
 
-        _httpClient = new HttpClient();
+        _httpClient = httpClient ?? new HttpClient();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
-        _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true};
+        _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         _jsonOptions.Converters.Add(new DecimalConverter());
         _configuration = configuration;
     }
@@ -50,7 +48,7 @@ public class BankNorwegian : IBank
 
             if (apiResponse != null)
                 return ConvertToTransactions(apiResponse);
-            
+
             Console.WriteLine("Failed to deserialize the API response.");
             return [];
 
@@ -96,14 +94,14 @@ public class BankNorwegian : IBank
         })
             .ToList();
     }
-    
+
     private async Task<HttpResponseMessage> SendRequestWithTokenRefresh()
     {
         var response = await _httpClient.GetAsync($"{_baseUrl}{_accountPath}");
 
-        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized) 
+        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
             return response;
-        
+
         Console.WriteLine("Access token expired. Refreshing token...");
         await RefreshToken();
         response = await _httpClient.GetAsync(_baseUrl);
@@ -122,17 +120,20 @@ public class BankNorwegian : IBank
         response.EnsureSuccessStatusCode();
 
         var tokenResponse = await response.Content.ReadAsStringAsync();
-        var newAccessToken = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponse)?["access"] ?? throw new InvalidOperationException("Access token not found in response");;
+        var newAccessToken = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponse)?["access"] ?? throw new InvalidOperationException("Access token not found in response");
+        var newRefreshToken = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponse)?["refresh"] ?? throw new InvalidOperationException("Refresh token not found in response");
         _accessToken = newAccessToken;
+        _refreshToken = newRefreshToken;
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-        UpdateAccessTokenInConfiguration(newAccessToken);
+        UpdateAccessTokenInConfiguration(newAccessToken, newRefreshToken);
     }
-    
 
-    private void UpdateAccessTokenInConfiguration(string newAccessToken)
+
+    private void UpdateAccessTokenInConfiguration(string newAccessToken, string newRefreshToken)
     {
         var configRoot = (IConfigurationRoot)_configuration;
-        configRoot["BankNorwegian:ApiKey"] = newAccessToken;
+        configRoot["BankNorwegian:Access"] = newAccessToken;
+        configRoot["BankNorwegian:Refresh"] = newRefreshToken;
         var filePath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         File.WriteAllText(filePath, JsonSerializer.Serialize(configRoot.GetSection("BankNorwegian").Get<Dictionary<string, string>>(), new JsonSerializerOptions { WriteIndented = true }));
     }
