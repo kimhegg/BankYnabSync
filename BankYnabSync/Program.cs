@@ -2,7 +2,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using BankYnabSync.Models;
+using BankYnabSync.Models.Bank;
+using BankYnabSync.Models.Repositories;
+using BankYnabSync.Models.Services;
+using BankYnabSync.Repository;
 using BankYnabSync.Services;
 
 namespace BankYnabSync;
@@ -37,6 +40,8 @@ namespace BankYnabSync;
                 .ConfigureServices((hostContext, services) =>
                 {
                     services.AddTransient<IBank, BankNorwegian>();
+                    services.AddTransient<IYnabRepository, YnabRepository>();
+                    services.AddTransient<IYnabService, YnabService>();
                     services.AddTransient<SyncService>();
                 });
     }

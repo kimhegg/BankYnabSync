@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using BankYnabSync.Models;
+using BankYnabSync.Models.Bank;
+using BankYnabSync.Services.Tools;
 using Microsoft.Extensions.Configuration;
 
 namespace BankYnabSync.Services;
@@ -39,12 +41,12 @@ public class BankNorwegian : IBank
     {
         try
         {
-            var response = await SendRequestWithTokenRefresh();
+            //var response = await SendRequestWithTokenRefresh();
 
-            LogRateLimitInfo(response);
-            response.EnsureSuccessStatusCode();
-            var apiResponse = JsonSerializer.Deserialize<ApiResponse>(await response.Content.ReadAsStringAsync(), _jsonOptions);
-            //var apiResponse = JsonSerializer.Deserialize<ApiResponse>(LoadResultFile(), _jsonOptions);
+            //LogRateLimitInfo(response);
+            //response.EnsureSuccessStatusCode();
+            //var apiResponse = JsonSerializer.Deserialize<ApiResponse>(await response.Content.ReadAsStringAsync(), _jsonOptions);
+            var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(LoadResultFile(), _jsonOptions);
 
             if (apiResponse != null)
                 return ConvertToTransactions(apiResponse);
@@ -82,9 +84,9 @@ public class BankNorwegian : IBank
             Console.WriteLine($"Rate Limit Reset: {resetValues.FirstOrDefault()}s");
     }
 
-    private List<Transaction> ConvertToTransactions(ApiResponse apiResponse)
+    private List<Transaction> ConvertToTransactions(BankTransactionResponse bankTransactionResponse)
     {
-        return apiResponse.Transactions.Booked.Select(item => new Transaction
+        return bankTransactionResponse.Transactions.Booked.Select(item => new Transaction
         {
             Id = item.TransactionId,
             Date = DateTime.Parse(item.BookingDate),

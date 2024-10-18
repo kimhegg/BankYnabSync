@@ -2,8 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-
-namespace BankYnabSync.Services;
+namespace BankYnabSync.Services.Tools;
 
 public class DecimalConverter : JsonConverter<decimal>
 {

@@ -1,4 +1,4 @@
-namespace BankYnabSync.Models;
+namespace BankYnabSync.Models.Bank;
 
 public class BookedTransaction
 {
