@@ -25,7 +25,7 @@ public class BankNorwegian : IBank
         _accessToken = configuration["BankNorwegian:Access"];
         _refreshToken = configuration["BankNorwegian:Refresh"];
 
-        if (string.IsNullOrEmpty(_baseUrl) || string.IsNullOrEmpty(_accessToken))
+        if (string.IsNullOrEmpty(_baseUrl) || string.IsNullOrEmpty(_accessToken) || string.IsNullOrEmpty(_refreshToken))
             throw new InvalidOperationException("Bank Norwegian URL or API Key is missing from configuration.");
 
 
