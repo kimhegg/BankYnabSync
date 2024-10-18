@@ -3,6 +3,7 @@ using System.Text.Json;
 using BankYnabSync.Models;
 using BankYnabSync.Models.Bank;
 using BankYnabSync.Services.Tools;
+using GoCardless.Resources;
 using Microsoft.Extensions.Configuration;
 
 namespace BankYnabSync.Services;
@@ -41,12 +42,12 @@ public class BankNorwegian : IBank
     {
         try
         {
-            //var response = await SendRequestWithTokenRefresh();
+            var response = await SendRequestWithTokenRefresh();
 
-            //LogRateLimitInfo(response);
-            //response.EnsureSuccessStatusCode();
-            //var apiResponse = JsonSerializer.Deserialize<ApiResponse>(await response.Content.ReadAsStringAsync(), _jsonOptions);
-            var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(LoadResultFile(), _jsonOptions);
+            LogRateLimitInfo(response);
+            response.EnsureSuccessStatusCode();
+            var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(await response.Content.ReadAsStringAsync(), _jsonOptions);
+            //var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(LoadResultFile(), _jsonOptions);
 
             if (apiResponse != null)
                 return ConvertToTransactions(apiResponse);
@@ -113,32 +114,41 @@ public class BankNorwegian : IBank
 
     private async Task RefreshToken()
     {
-        var refreshTokenUrl = $"{_baseUrl}api/v2/token/refresh/";
+        var refreshTokenUrl = $"{_baseUrl}token/refresh/";
 
         var request = new HttpRequestMessage(HttpMethod.Post, refreshTokenUrl);
-        request.Headers.Add("Authorization", $"Bearer {_refreshToken}");
+        var content = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("refresh", _refreshToken)
+        });
+
+        request.Content = content;
 
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
-        var tokenResponse = await response.Content.ReadAsStringAsync();
-        var newAccessToken = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponse)?["access"] ?? throw new InvalidOperationException("Access token not found in response");
-        var newRefreshToken = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponse)?["refresh"] ?? throw new InvalidOperationException("Refresh token not found in response");
-        _accessToken = newAccessToken;
-        _refreshToken = newRefreshToken;
+        var tokenResponseJson = await response.Content.ReadAsStringAsync();
+        var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(tokenResponseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
+        {
+            throw new InvalidOperationException("Failed to deserialize token response or access token is missing");
+        }
+
+        _accessToken = tokenResponse.AccessToken;
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-        UpdateAccessTokenInConfiguration(newAccessToken, newRefreshToken);
+        UpdateAccessTokenInConfiguration(tokenResponse.AccessToken);
+
+        Console.WriteLine($"Token refreshed. New access token expires in {tokenResponse.AccessExpires} seconds.");
     }
 
 
-    private void UpdateAccessTokenInConfiguration(string newAccessToken, string newRefreshToken)
+    private void UpdateAccessTokenInConfiguration(string newAccessToken)
     {
         var configRoot = (IConfigurationRoot)_configuration;
         configRoot["BankNorwegian:Access"] = newAccessToken;
-        configRoot["BankNorwegian:Refresh"] = newRefreshToken;
         var filePath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         File.WriteAllText(filePath, JsonSerializer.Serialize(configRoot.GetSection("BankNorwegian").Get<Dictionary<string, string>>(), new JsonSerializerOptions { WriteIndented = true }));
     }
-
 }
 
