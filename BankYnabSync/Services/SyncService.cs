@@ -1,16 +1,16 @@
 
-using BankYnabSync.Models;
 using BankYnabSync.Models.Bank;
+using BankYnabSync.Models.Repositories;
 using BankYnabSync.Models.Services;
-using Microsoft.Extensions.Configuration;
+
 
 namespace BankYnabSync.Services
 {
-    public class SyncService(IConfiguration configuration, IYnabService ynabService)
+    public class SyncService(IYnabService ynabService, IBankRepository bankRepository)
     {
         public async Task SyncTransactions()
         {
-            var banks = new List<IBank> { new BankNorwegian(configuration) };
+            var banks = new List<IBank> { new BankNorwegian(bankRepository) };
             foreach (var bank in banks)
             {
                 try
