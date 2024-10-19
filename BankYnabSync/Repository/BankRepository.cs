@@ -8,47 +8,71 @@ using Microsoft.Extensions.Configuration;
 
 namespace BankYnabSync.Repository;
 
-public class BankRepository(IConfiguration configuration) : IBankRepository
+public class BankRepository: IBankRepository
 {
-    
-    public async Task<List<Transaction>> GetTransactions()
-    {
-        var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["BankNorwegian:Access"]);
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+    private readonly JsonSerializerOptions _jsonOptions;
 
-        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        jsonOptions.Converters.Add(new DecimalConverter());
+    public BankRepository(IConfiguration configuration)
+    {
+        _httpClient = new HttpClient();
+        _configuration = configuration;
+        _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        _jsonOptions.Converters.Add(new DecimalConverter());
+    }
+    
+   
+    
+    public async Task<List<Transaction>> GetTransactions(string bankAccountPath)
+    {
+        var url = $"{_configuration["Bank:BaseUrl"]}{bankAccountPath}";
+        var result = await FetchAndDeserialize<BankTransactionResponse>(url, ConvertToTransactions);
+        return result as List<Transaction> ?? [];
+    }
+
+    public async Task<List<BankInfo>> GetBanks()
+    {
+        var url = "https://bankaccountdata.gocardless.com/api/v2/institutions/?country=no"; 
+        var result = await FetchAndDeserialize<List<BankInfo>>(url);
+        return result as List<BankInfo> ?? [];
+    }
+    
+    private async Task<object> FetchAndDeserialize<T>(string url, Func<T, List<Transaction>>? converter = null) where T : class
+    {
         try
         {
-            var url = $"{configuration["BankNorwegian:BaseUrl"]}{configuration["BankNorwegian:AccountPath"]}";
-            var response = await SendRequestWithTokenRefresh(httpClient, url);
+            var response = await SendRequestWithTokenRefresh(_httpClient, url);
             LogRateLimitInfo(response);
             response.EnsureSuccessStatusCode();
-            var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(await response.Content.ReadAsStringAsync(), jsonOptions);
-            //var apiResponse = JsonSerializer.Deserialize<BankTransactionResponse>(LoadResultFile(), _jsonOptions);
+        
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<T>(content, _jsonOptions);
 
-            if (apiResponse != null)
-                return ConvertToTransactions(apiResponse);
-
-            Console.WriteLine("Failed to deserialize the API response.");
+            if (result != null)
+            {
+                if (converter != null)
+                    return converter(result);
+                return result;
+            }
+        
+            Console.WriteLine($"Failed to deserialize the API response for {typeof(T).Name}.");
             return default;
-
         }
         catch (HttpRequestException e)
         {
-            Console.WriteLine($"Error fetching transactions: {e.Message}");
+            Console.WriteLine($"Error fetching data: {e.Message}");
             return default;
         }
         catch (JsonException e)
         {
             Console.WriteLine($"Error deserializing JSON: {e.Message}");
             return default;
-        }finally
-        {
-            httpClient.Dispose();
         }
     }
+
     
+
     private string LoadResultFile()
     {
         return File.ReadAllText("result.json");
@@ -96,12 +120,12 @@ public class BankRepository(IConfiguration configuration) : IBankRepository
 
     private async Task RefreshToken(HttpClient httpClient)
     {
-        var refreshTokenUrl = $"{configuration["BankNorwegian:BaseUrl"]}token/refresh/";
+        var refreshTokenUrl = $"{_configuration["Bank:BaseUrl"]}token/refresh/";
 
         var request = new HttpRequestMessage(HttpMethod.Post, refreshTokenUrl);
         var content = new FormUrlEncodedContent(new[]
         {
-            new KeyValuePair<string, string>("refresh", configuration["BankNorwegian:Refresh"])
+            new KeyValuePair<string, string>("refresh", _configuration["Bank:Refresh"])
         });
 
         request.Content = content;

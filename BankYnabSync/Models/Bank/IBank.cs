@@ -2,6 +2,7 @@ namespace BankYnabSync.Models.Bank;
 
 public interface IBank
 {
-    string Name { get; }
-    Task<List<Transaction>> GetTransactions();
+
+    Task<List<Transaction>> GetTransactions(string bankAccountPath);
+    Task<List<BankInfo>> GetBanksAsync();
 }

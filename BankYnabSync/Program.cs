@@ -40,7 +40,7 @@ namespace BankYnabSync;
                 })
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddTransient<IBank, BankNorwegian>();
+                    services.AddTransient<IBank, BankService>();
                     services.AddTransient<IYnabRepository, YnabRepository>();
                     services.AddTransient<IBankRepository, BankRepository>();
                     services.AddTransient<IYnabService, YnabService>();

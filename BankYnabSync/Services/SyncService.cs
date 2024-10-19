@@ -10,17 +10,17 @@ namespace BankYnabSync.Services
     {
         public async Task SyncTransactions()
         {
-            var banks = new List<IBank> { new BankNorwegian(bankRepository) };
+            var banks = new List<IBank> { new BankService(bankRepository) };
             foreach (var bank in banks)
             {
                 try
                 {
-                    await ynabService.InsertTransactionsFromBank(bank);
-                    Console.WriteLine($"Synced transactions from {bank.Name}");
+                    await ynabService.InsertTransactionsFromBanks(bank);
+                    Console.WriteLine($"Synced transactions ");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error syncing transactions from {bank.Name}: {ex.Message}");
+                    Console.WriteLine($"Error syncing transactions: {ex.Message}");
                 }
             }
         }

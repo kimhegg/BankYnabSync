@@ -4,5 +4,6 @@ namespace BankYnabSync.Models.Repositories;
 
 public interface IBankRepository
 {
-    Task<List<Transaction>> GetTransactions();
+    Task<List<Transaction>> GetTransactions(string bankAccountPath);
+    Task<List<BankInfo>> GetBanks();
 }

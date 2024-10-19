@@ -4,5 +4,5 @@ namespace BankYnabSync.Models.Services;
 
 public interface IYnabService
 {
-    Task InsertTransactionsFromBank(IBank bank);
+    Task InsertTransactionsFromBanks(IBank bank);
 }

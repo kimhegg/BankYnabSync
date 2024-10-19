@@ -1,4 +1,6 @@
-using System.Text.Json;
+
+using System.Security.Cryptography;
+using System.Text;
 using BankYnabSync.Models.Bank;
 using BankYnabSync.Models.Repositories;
 using BankYnabSync.Models.Services;
@@ -11,8 +13,8 @@ namespace BankYnabSync.Services;
 public class YnabService(IConfiguration configuration, IYnabRepository repository) : IYnabService
 {
     private readonly string _ynabTestBudget = configuration["Ynab:TestBudgetId"];
-    
-    public async Task InsertTransactionsFromBank(IBank bank)
+
+    public async Task InsertTransactionsFromBanks(IBank bank)
     {
         var budgets = await repository.ListBudgets();
         var budget = budgets.FirstOrDefault();
@@ -30,14 +32,16 @@ public class YnabService(IConfiguration configuration, IYnabRepository repositor
             return;
         }
         // Fetch transactions from the bank
-        var bankTransactions = await bank.GetTransactions();
+        var bankNorwegianTransactions = await bank.GetTransactions(configuration["Bank:BankNorwegianAccountPath"]);
+        var bankSsfTransactions = await bank.GetTransactions(configuration["Bank:BankSsfAccountPath"]);
+        var allTransactions = bankNorwegianTransactions.Concat(bankSsfTransactions).ToList();
 
         // Fetch categories from YNAB
         var categoryResponse = await repository.GetCategories(_ynabTestBudget);
         var categoryNameToIdMap = BuildCategoryNameToIdMap(categoryResponse);
 
         // Convert bank transactions to YNAB format
-        var ynabTransactions = bankTransactions.Select(t =>
+        var ynabTransactions = allTransactions.Select(t =>
         {
             var mappedCategory = t.Category != null ? CategoryMapper.MapCategory(t.Category) : "";
             string categoryId = null;
@@ -57,7 +61,7 @@ public class YnabService(IConfiguration configuration, IYnabRepository repositor
                 memo = t.Category, // Keep the original category in the memo field
                 cleared = "cleared",
                 approved = false,
-                import_id = $"YNAB:{t.Id}" // Use a unique import_id to prevent duplicates
+                import_id = $"YNAB:{CreateImportId(t.Id)}" // Use a unique import_id to prevent duplicates
             };
         }).ToList();
 
@@ -65,7 +69,13 @@ public class YnabService(IConfiguration configuration, IYnabRepository repositor
 
         Console.WriteLine($"Successfully inserted {ynabTransactions.Count} transactions into YNAB.");
     }
-    
+
+    private string CreateImportId(string originalId)
+    {
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(originalId));
+        return Convert.ToBase64String(hashBytes)[..22].Replace("/", "_").Replace("+", "-");
+    }
+
     private Dictionary<string, string> BuildCategoryNameToIdMap(CategoryResponse categoryResponse)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -75,7 +85,7 @@ public class YnabService(IConfiguration configuration, IYnabRepository repositor
 
         foreach (var group in categoryResponse.Data.CategoryGroups)
         {
-            if (group?.Categories == null) 
+            if (group?.Categories == null)
                 continue;
 
             foreach (var category in group.Categories.OfType<Category>().Where(category => !string.IsNullOrWhiteSpace(category.Name) && !string.IsNullOrWhiteSpace(category.Id)))
