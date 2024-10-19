@@ -7,6 +7,7 @@ using BankYnabSync.Models.Repositories;
 using BankYnabSync.Models.Services;
 using BankYnabSync.Repository;
 using BankYnabSync.Services;
+using BankYnabSync.Services.Tools;
 
 namespace BankYnabSync;
 
@@ -42,6 +43,7 @@ namespace BankYnabSync;
                     services.AddTransient<IBank, BankNorwegian>();
                     services.AddTransient<IYnabRepository, YnabRepository>();
                     services.AddTransient<IYnabService, YnabService>();
+                    services.AddTransient<ISecretService, SecretService>();
                     services.AddTransient<SyncService>();
                 });
     }
