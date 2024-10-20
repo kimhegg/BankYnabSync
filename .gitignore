@@ -5,3 +5,4 @@ riderModule.iml
 /_ReSharper.Caches/
 BankYnabSync/appsettings.json
 /.idea
+BankYnabSync/appsettings.Development.json

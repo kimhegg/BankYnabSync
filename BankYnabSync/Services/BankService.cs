@@ -13,6 +13,11 @@ public class BankService(IBankRepository bankRepository) : IBank
         return await bankRepository.GetTransactions(bankAccountPath);
     }
     
+    public async Task<List<Transaction>> GetFakeTransactionsAsync()
+    {
+        return await bankRepository.GetFakeTransactionsAsync();
+    }
+    
     public async Task<List<BankInfo>> GetBanksAsync()
     {
 

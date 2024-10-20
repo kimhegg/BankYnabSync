@@ -27,35 +27,32 @@ public class BankRepository: IBankRepository
     public async Task<List<Transaction>> GetTransactions(string bankAccountPath)
     {
         var url = $"{_configuration["Bank:BaseUrl"]}{bankAccountPath}";
-        var result = await FetchAndDeserialize<BankTransactionResponse>(url, ConvertToTransactions);
-        return result as List<Transaction> ?? [];
+        var result = await FetchAndDeserialize<BankTransactionResponse>(url);
+        return ConvertToTransactions(result);
     }
 
     public async Task<List<BankInfo>> GetBanks()
     {
         var url = "https://bankaccountdata.gocardless.com/api/v2/institutions/?country=no"; 
         var result = await FetchAndDeserialize<List<BankInfo>>(url);
-        return result as List<BankInfo> ?? [];
+        return result;
     }
     
-    private async Task<object> FetchAndDeserialize<T>(string url, Func<T, List<Transaction>>? converter = null) where T : class
+    private async Task<T> FetchAndDeserialize<T>(string url) where T : class
     {
         try
         {
             var response = await SendRequestWithTokenRefresh(_httpClient, url);
             LogRateLimitInfo(response);
             response.EnsureSuccessStatusCode();
-        
+    
             var content = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<T>(content, _jsonOptions);
 
             if (result != null)
-            {
-                if (converter != null)
-                    return converter(result);
                 return result;
-            }
-        
+            
+    
             Console.WriteLine($"Failed to deserialize the API response for {typeof(T).Name}.");
             return default;
         }
@@ -72,22 +69,46 @@ public class BankRepository: IBankRepository
     }
 
     
-
+    public async Task<List<Transaction>> GetFakeTransactionsAsync()
+    {
+        var result = LoadResultFile();
+        return ConvertToTransactions(JsonSerializer.Deserialize<BankTransactionResponse>(result, _jsonOptions));
+    }
     private string LoadResultFile()
     {
         return File.ReadAllText("result.json");
     }
+    
     private List<Transaction> ConvertToTransactions(BankTransactionResponse bankTransactionResponse)
     {
-        return bankTransactionResponse.Transactions.Booked.Select(item => new Transaction
-            {
-                Id = item.TransactionId,
-                Date = DateTime.Parse(item.BookingDate),
-                Amount = item.TransactionAmount.Amount,
-                Payee = item.CreditorName,
-                Category = item.AdditionalInformation
-            })
-            .ToList();
+        var bookedTransactions = bankTransactionResponse.Transactions.Booked.Select(ConvertBookedTransaction).ToList();
+        var pendingTransactions = bankTransactionResponse.Transactions.Pending.Select(ConvertPendingTransaction).ToList();
+    
+        return bookedTransactions.Concat(pendingTransactions).ToList();
+    }
+ 
+    private Transaction ConvertBookedTransaction(BookedTransaction item)
+    {
+        return new Transaction
+        {
+            Id = item.TransactionId,
+            Date = DateTime.Parse(item.BookingDate),
+            Amount = item.TransactionAmount.Amount,
+            Payee = item.CreditorName,
+            Category = item.AdditionalInformation
+        };
+    }
+    
+    private Transaction ConvertPendingTransaction(PendingTransaction item)
+    {
+        return new Transaction
+        {
+            Id = item.TransactionId,
+            Date = DateTime.Parse(item.ValueDate),
+            Amount = item.TransactionAmount.Amount,
+            Payee = item.RemittanceInformationUnstructured,
+            Category = null, 
+        };
     }
 
     private void LogRateLimitInfo(HttpResponseMessage response)

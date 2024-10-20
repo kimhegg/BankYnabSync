@@ -6,7 +6,7 @@ using BankYnabSync.Models.Services;
 
 namespace BankYnabSync.Services
 {
-    public class SyncService(IYnabService ynabService, IBankRepository bankRepository)
+    public class SyncService(IYnabService ynabService, IBankRepository bankRepository) : ISyncService
     {
         public async Task SyncTransactions()
         {

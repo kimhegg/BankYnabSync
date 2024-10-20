@@ -32,8 +32,8 @@ public class YnabService(IConfiguration configuration, IYnabRepository repositor
             return;
         }
         // Fetch transactions from the bank
-        var bankNorwegianTransactions = await bank.GetTransactions(configuration["Bank:BankNorwegianAccountPath"]);
-        var bankSsfTransactions = await bank.GetTransactions(configuration["Bank:BankSsfAccountPath"]);
+        var bankNorwegianTransactions = await bank.GetFakeTransactionsAsync();//await bank.GetTransactions(configuration["Bank:BankNorwegianAccountPath"]);
+        var bankSsfTransactions = new List<Transaction>();//await bank.GetTransactions(configuration["Bank:BankSsfAccountPath"]);
         var allTransactions = bankNorwegianTransactions.Concat(bankSsfTransactions).ToList();
 
         // Fetch categories from YNAB
