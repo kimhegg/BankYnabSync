@@ -7,7 +7,13 @@ using BankYnabSync.Services;
 using BankYnabSync.Services.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigin",
+        builder => builder.WithOrigins("http://localhost:3000")
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
 // Add services to the container.
 builder.Services.AddControllers(); // Add this line to enable controllers
 builder.Services.AddEndpointsApiExplorer();
@@ -30,7 +36,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseCors("AllowSpecificOrigin"); 
 app.UseAuthorization(); // Add this line if you plan to use authorization
 
 app.MapControllers();
